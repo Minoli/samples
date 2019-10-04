@@ -19,7 +19,7 @@ import ballerina/config;
 public function build(cellery:ImageName iName) returns error? {
     int mysqlPort = 3306;
     string mysqlPassword = "root";
-    string mysqlScript = readFile("../mysql/init.sql");
+    string mysqlScript = readFile("./mysql/init.sql");
     //Mysql database service which stores the todos that were added via the todos service
     cellery:Component mysqlComponent = {
         name: "mysql-db",
@@ -65,7 +65,7 @@ public function build(cellery:ImageName iName) returns error? {
     cellery:Component todoServiceComponent = {
         name: "todos",
         source: {
-            image: "docker.io/mirage20/samples-todoapp-todos:latest"
+            image: "docker.io/wso2cellery/samples-todoapp-todos:latest-dev"
         },
         ingresses: {
             todo:  <cellery:HttpApiIngress>{
