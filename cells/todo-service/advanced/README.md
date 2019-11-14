@@ -32,6 +32,7 @@ This example uses three types of volumes as described below.
    The secret is created at runtime using the environment variables `MYSQL_USERNAME` and `MYSQL_PASSWORD`.
 
 ```ballerina
+// Cell file that wraps a todo micro service and mysql database.
 import celleryio/cellery;
 import ballerina/io;
 import ballerina/config;
@@ -39,11 +40,11 @@ import ballerina/config;
 public function build(cellery:ImageName iName) returns error? {
     int mysqlPort = 3306;
     string mysqlPassword = "root";
-    string mysqlScript = readFile("../mysql/init.sql");
+    string mysqlScript = readFile("./mysql/init.sql");
     //Mysql database service which stores the todos that were added via the todos service
     cellery:Component mysqlComponent = {
         name: "mysql-db",
-        source: {
+        src: {
             image: "library/mysql:8.0"
         },
         ingresses: {
@@ -72,7 +73,7 @@ public function build(cellery:ImageName iName) returns error? {
                 readOnly: false,
                 volume:<cellery:K8sNonSharedPersistence>{
                      name:"data-vol",
-                    //  storageClass:"local-storage",
+                     storageClass:"local-storage",
                      accessMode: ["ReadWriteOnce"],
                      request:"1G"
                 }
@@ -84,8 +85,8 @@ public function build(cellery:ImageName iName) returns error? {
     // to database to persists the information.
     cellery:Component todoServiceComponent = {
         name: "todos",
-        source: {
-            image: "docker.io/mirage20/samples-todoapp-todos:latest"
+        src: {
+            image: "docker.io/wso2cellery/samples-todoapp-todos:latest-dev"
         },
         ingresses: {
             todo:  <cellery:HttpApiIngress>{
@@ -145,23 +146,22 @@ public function build(cellery:ImageName iName) returns error? {
         }
     };
 
-    // Composite Initialization
+    // Cell Initialization
     cellery:CellImage cellImage = {
         components: {
             mysql: mysqlComponent,
             todoService: todoServiceComponent
         }
     };
-    return cellery:createImage(cellImage, untaint iName);
+    return <@untainted> cellery:createImage(cellImage,  iName);
 }
 
 public function run(cellery:ImageName iName, map<cellery:ImageName> instances, boolean startDependencies, boolean shareDependencies)
 returns (cellery:InstanceState[] | error?) {
-    // Read db credentials at runtime from env.
     string db_user = config:getAsString("MYSQL_USERNAME");
     string db_pwd = config:getAsString("MYSQL_PASSWORD");
     if (db_user == "" || db_pwd == "") {
-        panic error("MYSQL_USERNAME or MYSQL_PASSWORD not found in environment");
+            panic error("MYSQL_USERNAME or MYSQL_PASSWORD not found in environment");
     }
     cellery:NonSharedSecret mysqlCreds = {
         name: "db-credentials",
@@ -171,20 +171,20 @@ returns (cellery:InstanceState[] | error?) {
         }
     };
     error? e = cellery:createSecret(mysqlCreds);
-    cellery:CellImage todoCell = check cellery:constructImage(untaint iName);
-    return cellery:createInstance(todoCell, iName, instances, startDependencies, shareDependencies);
+    cellery:CellImage todoCell = check cellery:constructCellImage( iName);
+    return <@untainted> cellery:createInstance(todoCell, iName, instances, startDependencies, shareDependencies);
 }
 
 
 function readFile(string filePath) returns (string) {
-    io:ReadableByteChannel bchannel = io:openReadableFile(filePath);
+    io:ReadableByteChannel bchannel = <io:ReadableByteChannel> io:openReadableFile(filePath);
     io:ReadableCharacterChannel cChannel = new io:ReadableCharacterChannel(bchannel, "UTF-8");
 
     var readOutput = cChannel.read(5000);
     if (readOutput is string) {
-        return readOutput;
+        return <@untainted> readOutput;
     } else {
-        return "Error: Unable to read file " + filePath;
+        return <@untainted> "Error: Unable to read file " + filePath;
     }
 }
 ```
@@ -201,7 +201,7 @@ Follow below instructions to build, run and push the `todo` cell.
     ```
     2. Create the volume by deploying pv-docker-desktop.yaml
     ```bash
-       $ kubctl create -f ../pv-docker-desktop.yaml
+       $ kubectl create -f ../pv-docker-desktop.yaml
            storageclass.storage.k8s.io/local-storage created
            persistentvolume/mysql-pv-volume created
     ```
@@ -218,7 +218,7 @@ Follow below instructions to build, run and push the `todo` cell.
     ```
     3. Create the volume by deploying pv-docker-desktop.yaml
     ```bash
-       $ kubctl create -f ../pv-local.yaml
+       $ kubectl create -f ../pv-local.yaml
        storageclass.storage.k8s.io/local-storage created
        persistentvolume/mysql-pv-volume created
     ```
@@ -349,7 +349,8 @@ Execute below steps to invoke `todo-api` in Global APIM.
 
 # 4. Push your cell  
 As a final step, let's push your todo-cell [cellery hub](https://hub.cellery.io/) account as shown below.
-    ```
+
+```bash
     $ cellery push <CELLERY_HUB_ORG>/todo-cell-advanced:latest
     ✔ Connecting to registry-1.docker.io
     ✔ Reading image <CELLERY_HUB_ORG>/todo-cell-advanced:latest from the Local Repository
@@ -365,7 +366,8 @@ As a final step, let's push your todo-cell [cellery hub](https://hub.cellery.io/
     Execute the following command to pull the image:
       $ cellery pull <CELLERY_HUB_ORG>/todo-cell-advanced:latest
     --------------------------------------------------------
-    ```
+```
+
 Congratulations! You have successfully created your own cell!
 
 # 5. Clean up the setup.

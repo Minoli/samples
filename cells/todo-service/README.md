@@ -31,7 +31,7 @@ This example uses three types of volumes as described below.
    3. Secret: The database credentials are mounted as a secret to `todoServiceComponet` in the path `/credentials`.    
 
 ```ballerina
-// Composite file that wraps a to do micro service and mysql database.
+// Cell file that wraps a todo micro service and mysql database.
 import celleryio/cellery;
 import ballerina/io;
 
@@ -44,7 +44,7 @@ public function build(cellery:ImageName iName) returns error? {
     //Mysql database service which stores the todos that were added via the todos service
     cellery:Component mysqlComponent = {
         name: "mysql-db",
-        source: {
+        src: {
             image: "library/mysql:8.0"
         },
         ingresses: {
@@ -85,7 +85,7 @@ public function build(cellery:ImageName iName) returns error? {
     // to database to persists the information.
     cellery:Component todoServiceComponent = {
         name: "todos",
-        source: {
+        src: {
             image: "docker.io/mirage20/samples-todoapp-todos:latest"
         },
         ingresses: {
@@ -128,7 +128,7 @@ public function build(cellery:ImageName iName) returns error? {
             DATABASE_NAME: {
                 value: "todos_db"
             },
-            DATABASE_CREDENTIALS_PATH:{
+            DATABASE_CREDENTIALS_PATH: {
                 value: "/credentials"
             }
         },
@@ -150,32 +150,32 @@ public function build(cellery:ImageName iName) returns error? {
         }
     };
 
-    // Composite Initialization
+    // Cell Initialization
     cellery:CellImage cellImage = {
         components: {
             mysql: mysqlComponent,
             todoService: todoServiceComponent
         }
     };
-    return cellery:createImage(cellImage, untaint iName);
+    return <@untainted> cellery:createImage(cellImage,  iName);
 }
 
 public function run(cellery:ImageName iName, map<cellery:ImageName> instances, boolean startDependencies, boolean shareDependencies)
 returns (cellery:InstanceState[] | error?) {
-    cellery:Composite composite = check cellery:constructImage(untaint iName);
-    return cellery:createInstance(composite, iName, instances, startDependencies, shareDependencies);
+    cellery:CellImage cell = check cellery:constructCellImage(iName);
+    return <@untainted> cellery:createInstance(cell, iName, instances, startDependencies, shareDependencies);
 }
 
 
 function readFile(string filePath) returns (string) {
-    io:ReadableByteChannel bchannel = io:openReadableFile(filePath);
+    io:ReadableByteChannel bchannel = <io:ReadableByteChannel> io:openReadableFile(filePath);
     io:ReadableCharacterChannel cChannel = new io:ReadableCharacterChannel(bchannel, "UTF-8");
 
     var readOutput = cChannel.read(5000);
     if (readOutput is string) {
-        return readOutput;
+        return <@untainted> readOutput;
     } else {
-        return "Error: Unable to read file "+filePath;
+        return <@untainted> "Error: Unable to read file " + filePath;
     }
 }
 ```
@@ -208,7 +208,7 @@ Follow below instructions to build, run and push the `todo` cell.
     ```
     3. Create the volume by deploying pv-docker-desktop.yaml
     ```bash
-       $ kubctl create -f https://raw.githubusercontent.com/wso2-cellery/samples/master/cells/todo-service/pv-local.yaml
+       $ kubectl create -f https://raw.githubusercontent.com/wso2-cellery/samples/master/cells/todo-service/pv-local.yaml
     ```
    
    #### GCP
@@ -359,7 +359,7 @@ Congratulations! You have successfully created your own cell!
     ```bash
     $ cellery terminate todos
     $ kubectl delete pvc todos--mysql-db-data-vol-pvc
-    $ kubectl delete pv -f pv-local.yaml
+    $ kubectl delete -f pv-local.yaml
     ```
    
 Try the [advanced todo service](./advanced) next to learn how to create volumes at runtime.
